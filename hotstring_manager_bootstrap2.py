@@ -7,34 +7,52 @@ Created on Sat Mar 26 00:52:29 2022
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from ahk import AHK
+from pathlib import Path
+import subprocess
+from threading import Thread
 
 
-class Manager(ttk.Frame):
-    def __init__(self, master, **kwargs):
-        super().__init__(master, padding=10, **kwargs)
-        ttk.Style().configure("TButton", font="TkFixedFont 12")
-        self.pack(fill=BOTH, expand=YES)
-        if "bootstyle" in kwargs:
-            self.bootstyle = kwargs.pop("bootstyle")
-        else:
-            self.bootstyle = None
-        # point to AHK executable
+class AsynClicked(Thread):
+    def __init__(self, hslist):
+        super().__init__()
         self.ahk = AHK(executable_path='C:\\Program Files\\AutoHotkey\\AutoHotkey.exe')
-        self.create_shortcuts()
+        self.ahk_process = None
+        self.hslist = hslist
+        self.daemon = True
         
-    def clicked(self):
-        f = open("C:/Users/felix/OneDrive/Documents/Hotstring_Manager/hotstring_manager.ahk","w+")
+    def run(self):
+        ahk_path = str(Path(__file__).parents[0]) + "\\hotstring_manager.ahk"
+        f = open(ahk_path,"w+")
         f.write("#SingleInstance Force \n#NoEnv \nSendMode Input\nSetWorkingDir %A_ScriptDir% \n")
-        hslist = [self.hs1.get(), self.hs2.get(), self.hs3.get(), self.hs4.get(), 
-                  self.hs5.get(), self.hs6.get(), self.hs7.get(), self.hs8.get(), self.hs9.get()]
-        for index, item in enumerate(hslist):
+
+        for index, item in enumerate(self.hslist):
             if item != '':
                 key = str(index+1)
                 strList = ["Numpad", key, "::\nSend ", str(item or ''), "\nreturn \n"] 
                 insert = ''.join(strList)
                 f.write(insert)
         f.close()
-        self.ahk.run_script("C:/Users/felix/OneDrive/Documents/Hotstring_Manager/hotstring_manager.ahk", blocking=False)
+        if self.ahk_process is not None:
+            self.ahk_process.kill()
+        self.ahk_process = subprocess.call(["C:\\Program Files\\AutoHotkey\\AutoHotkey.exe", ahk_path])
+
+class Manager(ttk.Frame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, padding=10, **kwargs)
+        ttk.Style().configure("TButton", font="TkFixedFont 12")
+        # self.protocol("WM_DELETE_WINDOW", on_closing)
+        self.pack(fill=BOTH, expand=YES)
+        if "bootstyle" in kwargs:
+            self.bootstyle = kwargs.pop("bootstyle")
+        else:
+            self.bootstyle = None
+        self.create_shortcuts()
+        
+    def handle_clicked(self):
+        hslist = [self.hs1.get(), self.hs2.get(), self.hs3.get(), self.hs4.get(), 
+          self.hs5.get(), self.hs6.get(), self.hs7.get(), self.hs8.get(), self.hs9.get()]
+        clicked_thread = AsynClicked(hslist)
+        clicked_thread.start()
 
     def clear(self):
         self.hs1.delete(0, END)
@@ -46,8 +64,15 @@ class Manager(ttk.Frame):
         self.hs7.delete(0, END)
         self.hs8.delete(0, END)
         self.hs9.delete(0, END)
-        open("C:/Users/felix/OneDrive/Documents/Hotstring_Manager/hotstring_manager.ahk", "w").close()
-
+        hslist = [self.hs1.get(), self.hs2.get(), self.hs3.get(), self.hs4.get(), 
+          self.hs5.get(), self.hs6.get(), self.hs7.get(), self.hs8.get(), self.hs9.get()]
+        clicked_thread = AsynClicked(hslist)
+        clicked_thread.start()
+       
+    # def on_closing(self):
+    #   clear(self)
+    #   self.destroy()
+       
     def create_shortcuts(self):
         container = ttk.Frame(master=self, padding=2, bootstyle=self.bootstyle)
         container.pack(fill=BOTH, expand=YES)
@@ -90,17 +115,15 @@ class Manager(ttk.Frame):
         self.hs9 = ttk.Entry(container,width=40, textvariable = self.hs9)
         self.hs9.grid(column=2, row=9, padx=1, pady=1)
 
-        btn = ttk.Button(container, text="Update Hotstrings", command=self.clicked)
+        btn = ttk.Button(container, text="Update Hotstrings", command=self.handle_clicked)
         btn.grid(column=2, row=10, padx=10, pady=1)
         btn_clear = ttk.Button(container, text="Clear", command=self.clear)
         btn_clear.grid(column=1, row=10, padx=10, pady=1)
-
-
+    
 if __name__ == "__main__":
-
     app = ttk.Window(
         title="Hostring Manager",
-        themename="solar",
+        themename="darkly",
         size=(400, 450)
     )
     Manager(app)
